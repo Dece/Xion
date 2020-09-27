@@ -10,18 +10,26 @@ class Xfconf:
     def __init__(self, xq=None):
         self._xq = xq or self.find_xq()
 
-    def xq(self, command):
+    def xq(self, command, print_failures=True):
         """Run a xion-query command and return its output or None on error."""
         command.insert(0, self._xq)
         try:
-            return subprocess.check_output(command).decode()
+            return subprocess.check_output(
+                command, stderr=subprocess.STDOUT
+            ).decode()
         except subprocess.CalledProcessError as exc:
-            print(exc)
+            if not print_failures:
+                return None
+            print(f"xion-query command failed with code {exc.returncode}.")
+            if exc.stdout:
+                print("stdout:", exc.stdout.decode().strip())
+            if exc.stderr:
+                print("stderr:", exc.stderr.decode().strip())
             return None
 
-    def xqs(self, command_str):
+    def xqs(self, command_str, print_failures=True):
         """Wrapper of xq, splitting a string command."""
-        return self.xq(command_str.split(" "))
+        return self.xq(command_str.split(" "), print_failures=print_failures)
 
     def get_channel_list(self):
         """Return the channel list or None on error."""
@@ -37,6 +45,11 @@ class Xfconf:
             return None
         return [p for p in output.splitlines() if p.startswith(root)]
 
+    def does_property_exist(self, channel, prop):
+        """Return True if this property exists."""
+        output = self.xqs(f"-c {channel} -p {prop}", print_failures=False)
+        return output is not None
+
     def get_property(self, channel, prop):
         """Return this property or None on error."""
         output = self.xqs(f"-c {channel} -p {prop}")
@@ -46,14 +59,25 @@ class Xfconf:
 
     def set_property(self, channel, prop, prop_type, value):
         """Create or update this property."""
-        # TODO handle new properties
-        self.update_property(channel, prop, value)
+        if not self.does_property_exist(channel, prop):
+            self.create_property(channel, prop, prop_type, value)
+        else:
+            self.update_property(channel, prop, value)
+
+    def create_property(self, channel, prop, prop_type, value):
+        """Create a new property with those params, return True on success."""
+        if " " in value:
+            value = f'"{value}"'
+        output = self.xq(["-c", channel, "-p", prop, "-n",
+                          "-t", prop_type, "-s", value])
+        if output is None:
+            return False
 
     def update_property(self, channel, prop, value):
         """Update an existing property, return True on success."""
         if " " in value:
             value = f'"{value}"'
-        output = self.xqs(f"-c {channel} -p {prop} -s {value}")
+        output = self.xq(["-c", channel, "-p", prop, "-s", value])
         return output == ""
 
     @staticmethod
