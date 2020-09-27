@@ -44,6 +44,18 @@ class Xfconf:
             return None
         return XfconfProperty.parse(output)
 
+    def set_property(self, channel, prop, prop_type, value):
+        """Create or update this property."""
+        # TODO handle new properties
+        self.update_property(channel, prop, value)
+
+    def update_property(self, channel, prop, value):
+        """Update an existing property, return True on success."""
+        if " " in value:
+            value = f'"{value}"'
+        output = self.xqs(f"-c {channel} -p {prop} -s {value}")
+        return output == ""
+
     @staticmethod
     def find_xq():
         xq = shutil.which("xion-query")
