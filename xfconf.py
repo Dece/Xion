@@ -1,11 +1,21 @@
 import re
 import shutil
+import string
 import subprocess
 from dataclasses import dataclass
 
 
 class Xfconf:
     """Interface around Xfconf, using xion-query behind the scene."""
+
+    # GTypes to xfconf-query types along with a value string parser.
+    TYPE_MAP = {
+        "gboolean": "bool",
+        "gint": "int",
+        "guint": "uint",
+        "gdouble": "double",
+        "gchararray": "string",
+    }
 
     def __init__(self, xq=None):
         self._xq = xq or self.find_xq()
@@ -21,6 +31,7 @@ class Xfconf:
             if not print_failures:
                 return None
             print(f"xion-query command failed with code {exc.returncode}.")
+            print("command:", command)
             if exc.stdout:
                 print("stdout:", exc.stdout.decode().strip())
             if exc.stderr:
@@ -58,26 +69,42 @@ class Xfconf:
         return XfconfProperty.parse(output)
 
     def set_property(self, channel, prop, prop_type, value):
-        """Create or update this property."""
+        """Create or update this property, return True on success."""
         if not self.does_property_exist(channel, prop):
-            self.create_property(channel, prop, prop_type, value)
+            return self.create_property(channel, prop, prop_type, value)
         else:
-            self.update_property(channel, prop, value)
+            return self.update_property(channel, prop, value)
 
     def create_property(self, channel, prop, prop_type, value):
         """Create a new property with those params, return True on success."""
-        if " " in value:
-            value = f'"{value}"'
+        prop_type = Xfconf.convert_type(prop_type)
+        if not prop_type:
+            return False
+        value = Xfconf.sanitize_str(value)
         output = self.xq(["-c", channel, "-p", prop, "-n",
                           "-t", prop_type, "-s", value])
-        if output is None:
-            return False
+        return output == ""
 
     def update_property(self, channel, prop, value):
         """Update an existing property, return True on success."""
-        if " " in value:
-            value = f'"{value}"'
+        value = Xfconf.sanitize_str(value)
         output = self.xq(["-c", channel, "-p", prop, "-s", value])
+        return output == ""
+
+    def set_property_array(self, channel, prop, values):
+        """Set a property array, return True on success.
+
+        Due to limitations in the way xfconf-query work, whether the array
+        exists or not it is entirely replaced by values.
+        """
+        command = ["-c", channel, "-p", prop, "-n", "-a"]
+        for value in values:
+            subtype = Xfconf.convert_type(value["type"])
+            if not subtype:
+                return False
+            subvalue = Xfconf.sanitize_str(value["value"])
+            command += ["-t", subtype, "-s", subvalue]
+        output = self.xq(command)
         return output == ""
 
     def reset_root(self, channel, root):
@@ -87,10 +114,28 @@ class Xfconf:
 
     @staticmethod
     def find_xq():
+        """Find xion-query in the path and return it, or None on failure."""
         xq = shutil.which("xion-query")
         if not xq:
-            exit("Could not find xion-query in path.")
+            print("Could not find xion-query in path.")
+            return None
         return xq
+
+    @staticmethod
+    def convert_type(gtype):
+        """Get an xfconf-query type from a gtype."""
+        xq_type = Xfconf.TYPE_MAP.get(gtype)
+        if xq_type is None:
+            print(f"Unknown gtype {gtype}.")
+        return xq_type
+
+    @staticmethod
+    def sanitize_str(value):
+        """Wrap value with doublequotes if it contains whitespaces."""
+        for char in string.whitespace:
+            if char in value:
+                return f'"{value}"'
+        return value
 
 
 XION_PROP_RE = re.compile(r"t:(\S+) (.+)")

@@ -57,15 +57,6 @@ def main():
 class Xion:
     """Manipulate Xfconf settings trees."""
 
-    # GTypes to xfconf-query types along with a value string parser.
-    TYPE_MAP = {
-        "gboolean": "bool",
-        "gint": "int",
-        "guint": "uint",
-        "gdouble": "double",
-        "gchararray": "string",
-    }
-
     def __init__(self, xq=None):
         self.xfconf = Xfconf(xq=xq)
 
@@ -94,6 +85,10 @@ class Xion:
                 leaf = Xion._build_prop_leaf(prop)
             tree[prop_name] = leaf
         return tree
+
+    @staticmethod
+    def _build_prop_leaf(prop):
+        return {"type": prop.gtype, "value": str(prop.value)}
 
     def export_tree(self, channel, root, tree, output_path):
         """Export a property tree as a sorted JSON file."""
@@ -139,20 +134,11 @@ class Xion:
 
     def apply_property(self, channel, name, content):
         """Update one property in Xfconf, return True on success."""
-        # if isinstance(content, list):
-        #     for subprop in content:
-        #         if not self.apply_property(channel,
+        if isinstance(content, list):
+            return self.xfconf.set_property_array(channel, name, content)
         prop_type = content["type"]
-        if not prop_type in Xion.TYPE_MAP:
-            print(f"Unknown property type {prop_type}!")
-            return False
-        xq_type = Xion.TYPE_MAP[prop_type]
         value = content["value"]
-        self.xfconf.set_property(channel, name, xq_type, value)
-
-    @staticmethod
-    def _build_prop_leaf(prop):
-        return {"type": prop.gtype, "value": str(prop.value)}
+        return self.xfconf.set_property(channel, name, prop_type, value)
 
 
 if __name__ == "__main__":
