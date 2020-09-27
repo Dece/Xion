@@ -22,6 +22,10 @@ def main():
         help="Import a JSON settings file"
     )
     argparser.add_argument(
+        "-r", "--replace", action="store_true",
+        help="Replace the root with imported settings, remove unknowns"
+    )
+    argparser.add_argument(
         "-y", "--yes", action="store_true",
         help="Do not ask for confirmation"
     )
@@ -33,16 +37,25 @@ def main():
         tree = xion.build_tree(channel, root)
         if tree is None:
             print("Failed to build config tree.")
-            return
-        xion.export_tree(channel, root, tree, output)
+            exit(1)
+        success = xion.export_tree(channel, root, tree, output)
+        exit(0 if success else 1)
     elif args.import_tree:
         channel, root, tree = xion.import_tree(args.import_tree)
         if channel and root and tree:
             force = bool(args.yes)
-            xion.apply_tree(channel, root, tree, confirm=not force)
+            replace = bool(args.replace)
+            success = xion.apply_tree(channel, root, tree,
+                                      confirm=not force, replace=replace)
+            exit(0 if success else 1)
+        else:
+            print("Import failed.")
+            exit(1)
+    exit(0)
 
 
 class Xion:
+    """Manipulate Xfconf settings trees."""
 
     # GTypes to xfconf-query types along with a value string parser.
     TYPE_MAP = {
@@ -57,9 +70,10 @@ class Xion:
         self.xfconf = Xfconf(xq=xq)
 
     def build_tree(self, channel, root="/"):
-        """Return a dict of configs in this channel, filtering on root.
+        """Return a dict of properties in this channel, filtering on root.
 
-        Return None on error.
+        Return None on error. Root has to start with "/" to be valid. Arrays are
+        added to the tree as a list of properties.
         """
         if not root.startswith("/"):
             print("Invalid root, must start with /")
@@ -82,14 +96,14 @@ class Xion:
         return tree
 
     def export_tree(self, channel, root, tree, output_path):
-        """Export a config tree as a sorted JSON file."""
+        """Export a property tree as a sorted JSON file."""
         tree["channel"] = channel
         tree["root"] = root
         with open(output_path, "wt") as output_file:
             json.dump(tree, output_file, indent=2, sort_keys=True)
 
     def import_tree(self, file_path):
-        """Load a config tree."""
+        """Load a property tree."""
         with open(file_path, "rt") as input_file:
             tree = json.load(input_file)
         try:
@@ -101,22 +115,33 @@ class Xion:
         return channel, root, tree
 
     def apply_tree(self, channel, root, tree, confirm=True, replace=False):
-        """Apply tree settings under root to channel."""
+        """Apply tree settings under root to channel, return True on success."""
         num_changes = len(tree)
-        print(f"Applying {num_changes} changes to {channel} under {root}.")
+        print(f"{num_changes} changes to do in {channel} for {root}.")
         if replace:
-            print("This will erase all settings in the channel.")
+            print("This will erase all properties in the channel.")
         if confirm and input("Confirm? [y/N]") != "y":
             print("Operation cancelled.")
-            return
+            return False
+        if replace and not self.clear_tree(channel, root):
+            print("Failed to clear properties.")
+            return False
         for prop, content in tree.items():
-            self.apply_property(channel, prop, content)
+            if not self.apply_property(channel, prop, content):
+                print(f"Failed to apply property {prop}.")
+                return False
+        print("Done.")
+        return True
+
+    def clear_tree(self, channel, root):
+        """Remove all channel configs under root, return True on success."""
+        return self.xfconf.reset_root(channel, root)
 
     def apply_property(self, channel, name, content):
         """Update one property in Xfconf, return True on success."""
         # if isinstance(content, list):
         #     for subprop in content:
-        #         if not self.apply_property(channel, 
+        #         if not self.apply_property(channel,
         prop_type = content["type"]
         if not prop_type in Xion.TYPE_MAP:
             print(f"Unknown property type {prop_type}!")

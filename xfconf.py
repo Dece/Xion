@@ -80,6 +80,11 @@ class Xfconf:
         output = self.xq(["-c", channel, "-p", prop, "-s", value])
         return output == ""
 
+    def reset_root(self, channel, root):
+        """Reset all channel properties under root, return True on success."""
+        output = self.xqs(f"-c {channel} -p {root} -r -R")
+        return output == ""
+
     @staticmethod
     def find_xq():
         xq = shutil.which("xion-query")
