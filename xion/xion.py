@@ -67,9 +67,10 @@ class Xion:
         if confirm and input("Confirm? [y/N]") != "y":
             print("Operation cancelled.")
             return False
-        if replace and not self.clear_tree(channel, root):
-            print("Failed to clear properties.")
-            return False
+        if replace:
+            if not self.clear_tree(channel, root):
+                print("Failed to clear properties.")
+                return False
         for prop, content in tree.items():
             if not self.apply_property(channel, prop, content):
                 print(f"Failed to apply property {prop}.")

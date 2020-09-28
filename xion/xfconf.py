@@ -80,14 +80,12 @@ class Xfconf:
         prop_type = Xfconf.convert_type(prop_type)
         if not prop_type:
             return False
-        value = Xfconf.sanitize_str(value)
         output = self.xq(["-c", channel, "-p", prop, "-n",
                           "-t", prop_type, "-s", value])
         return output == ""
 
     def update_property(self, channel, prop, value):
         """Update an existing property, return True on success."""
-        value = Xfconf.sanitize_str(value)
         output = self.xq(["-c", channel, "-p", prop, "-s", value])
         return output == ""
 
@@ -102,7 +100,7 @@ class Xfconf:
             subtype = Xfconf.convert_type(value["type"])
             if not subtype:
                 return False
-            subvalue = Xfconf.sanitize_str(value["value"])
+            subvalue = value["value"]
             command += ["-t", subtype, "-s", subvalue]
         output = self.xq(command)
         return output == ""
@@ -128,14 +126,6 @@ class Xfconf:
         if xq_type is None:
             print(f"Unknown gtype {gtype}.")
         return xq_type
-
-    @staticmethod
-    def sanitize_str(value):
-        """Wrap value with doublequotes if it contains whitespaces."""
-        for char in string.whitespace:
-            if char in value:
-                return f'"{value}"'
-        return value
 
 
 XION_PROP_RE = re.compile(r"t:(\S+) (.+)")
