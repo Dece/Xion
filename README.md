@@ -1,8 +1,6 @@
 Xion
 ====
 
-WORK IN PROGRESS
-
 Xion is a JSON interface to Xfconf, using a slightly modified xfconf-query
 bin. Backup and restore Xfce settings in VCS-friendly files.
 
@@ -84,4 +82,11 @@ somewhere in your path, e.g. in `/usr/local/bin/`.
 
 ### Get xion
 
-Right now Xion is not packaged, just download the repo, this is on the todolist.
+Xion is available on PyPI:
+
+```bash
+# Install system-wide.
+$ sudo pip3 install xion
+# Install for your user.
+$ pip3 install xion --user
+```
