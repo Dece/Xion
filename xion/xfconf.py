@@ -1,6 +1,5 @@
 import re
 import shutil
-import string
 import subprocess
 from dataclasses import dataclass
 
@@ -110,6 +109,7 @@ class Xfconf:
 
     def reset_root(self, channel, root):
         """Reset all channel properties under root, return True on success."""
+        root = root.rstrip("/")
         output = self.xqs(f"-c {channel} -p {root} -r -R")
         return output == ""
 
