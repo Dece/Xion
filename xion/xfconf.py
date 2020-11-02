@@ -17,12 +17,15 @@ class Xfconf:
         "gchararray": "string",
     }
 
-    def __init__(self, xq=None):
+    def __init__(self, xq=None, verbose=False):
         self._xq = xq or self.find_xq()
+        self.verbose = verbose
 
     def xq(self, command, print_failures=True):
         """Run a xion-query command and return its output or None on error."""
         command.insert(0, self._xq)
+        if self.verbose:
+            print(f"$ {' '.join(command)}")
         try:
             return subprocess.check_output(
                 command, stderr=subprocess.STDOUT

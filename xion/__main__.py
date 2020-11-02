@@ -28,9 +28,13 @@ def main():
         "-y", "--yes", action="store_true",
         help="Do not ask for confirmation"
     )
+    argparser.add_argument(
+        "-v", "--verbose", action="store_true",
+        help="Verbose output"
+    )
     args = argparser.parse_args()
 
-    xion = Xion(xq=args.xq_path)
+    xion = Xion(xq=args.xq_path, verbose=args.verbose)
     if args.export:
         channel, root, output = args.export
         tree = xion.build_tree(channel, root)

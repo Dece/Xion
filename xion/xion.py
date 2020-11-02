@@ -6,8 +6,9 @@ from xion.xfconf import Xfconf
 class Xion:
     """Manipulate Xfconf settings trees."""
 
-    def __init__(self, xq=None):
-        self.xfconf = Xfconf(xq=xq)
+    def __init__(self, xq=None, verbose=False):
+        self.xfconf = Xfconf(xq=xq, verbose=verbose)
+        self.verbose = verbose
 
     def build_tree(self, channel, root="/"):
         """Return a dict of properties in this channel, filtering on root.
